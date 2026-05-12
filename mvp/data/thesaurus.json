@@ -1,0 +1,111 @@
+{
+  "version": "1.0",
+  "domain": "RAG/AI Research",
+  "entries": [
+    {
+      "term": "RAG",
+      "synonyms": ["retrieval augmented generation", "retrieval-augmented generation"],
+      "broader": ["NLP", "information retrieval"],
+      "narrower": ["GraphRAG", "Self-RAG", "Agentic RAG", "HyDE"],
+      "related": ["LLM", "embedding", "vector search", "knowledge base"]
+    },
+    {
+      "term": "embedding",
+      "synonyms": ["vector embedding", "dense vector", "semantic vector", "text embedding"],
+      "broader": ["representation learning"],
+      "narrower": ["sentence embedding", "document embedding", "query embedding"],
+      "related": ["similarity search", "ANN", "cosine similarity"]
+    },
+    {
+      "term": "retrieval",
+      "synonyms": ["information retrieval", "document retrieval", "search"],
+      "broader": ["information access"],
+      "narrower": ["dense retrieval", "sparse retrieval", "hybrid retrieval"],
+      "related": ["indexing", "ranking", "relevance"]
+    },
+    {
+      "term": "hallucination",
+      "synonyms": ["confabulation", "factual error", "fabrication", "allucinazione"],
+      "broader": ["LLM reliability"],
+      "narrower": [],
+      "related": ["grounding", "faithfulness", "factuality"]
+    },
+    {
+      "term": "chunking",
+      "synonyms": ["text segmentation", "passage splitting", "document splitting"],
+      "broader": ["document processing"],
+      "narrower": ["semantic chunking", "fixed-size chunking", "recursive chunking"],
+      "related": ["chunk", "overlap", "context window"]
+    },
+    {
+      "term": "reranking",
+      "synonyms": ["re-ranking", "result reranking", "passage reranking"],
+      "broader": ["ranking"],
+      "narrower": ["cross-encoder reranking", "listwise reranking"],
+      "related": ["relevance scoring", "BM25", "semantic similarity"]
+    },
+    {
+      "term": "knowledge graph",
+      "synonyms": ["KG", "semantic graph", "knowledge base", "entity graph"],
+      "broader": ["knowledge representation"],
+      "narrower": ["domain ontology", "triple store"],
+      "related": ["entity", "relation", "ontology", "SPARQL"]
+    },
+    {
+      "term": "attention",
+      "synonyms": ["self-attention", "multi-head attention", "attention mechanism"],
+      "broader": ["transformer"],
+      "narrower": ["cross-attention", "causal attention"],
+      "related": ["transformer", "BERT", "GPT"]
+    },
+    {
+      "term": "fine-tuning",
+      "synonyms": ["finetuning", "model fine-tuning", "task-specific training", "supervised fine-tuning"],
+      "broader": ["transfer learning"],
+      "narrower": ["LoRA", "QLoRA", "instruction tuning"],
+      "related": ["pre-training", "RLHF", "adapter"]
+    },
+    {
+      "term": "benchmark",
+      "synonyms": ["evaluation benchmark", "test set", "evaluation dataset"],
+      "broader": ["evaluation"],
+      "narrower": [],
+      "related": ["BEIR", "MS MARCO", "NaturalQuestions", "TriviaQA", "RAGAS"]
+    },
+    {
+      "term": "context window",
+      "synonyms": ["context length", "input window", "token limit", "sequence length"],
+      "broader": ["LLM"],
+      "narrower": [],
+      "related": ["chunking", "long context", "lost in the middle"]
+    },
+    {
+      "term": "faithfulness",
+      "synonyms": ["factual consistency", "groundedness", "source fidelity"],
+      "broader": ["evaluation metrics"],
+      "narrower": [],
+      "related": ["hallucination", "grounding", "citation"]
+    },
+    {
+      "term": "vector search",
+      "synonyms": ["similarity search", "nearest neighbor search", "semantic search", "ANN search"],
+      "broader": ["retrieval"],
+      "narrower": ["HNSW", "flat index", "IVF"],
+      "related": ["Qdrant", "Faiss", "cosine similarity", "embedding"]
+    },
+    {
+      "term": "query expansion",
+      "synonyms": ["query rewriting", "query reformulation", "query enrichment"],
+      "broader": ["query processing"],
+      "narrower": ["HyDE", "pseudo-relevance feedback", "thesaurus expansion"],
+      "related": ["recall", "retrieval", "synonym"]
+    },
+    {
+      "term": "indexing",
+      "synonyms": ["document indexing", "corpus indexing", "inverted index"],
+      "broader": ["information retrieval"],
+      "narrower": ["BM25 index", "vector index", "tree index"],
+      "related": ["ingestione", "preprocessing", "tokenization"]
+    }
+  ]
+}

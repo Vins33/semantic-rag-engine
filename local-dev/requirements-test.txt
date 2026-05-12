@@ -1,0 +1,8 @@
+# Semantic RAG Engine — dipendenze per test locale del data layer
+minio>=7.2.0
+psycopg2-binary>=2.9.9
+redis>=5.0.4
+qdrant-client>=1.10.0
+opensearch-py>=2.6.0
+neo4j>=5.18.0
+python-dotenv>=1.0.0

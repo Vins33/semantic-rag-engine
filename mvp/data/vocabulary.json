@@ -1,0 +1,178 @@
+{
+  "version": "1.0",
+  "domain": "RAG/AI Research",
+  "terms": [
+    {
+      "id": "RAG",
+      "preferred": "Retrieval-Augmented Generation",
+      "aliases": ["RAG", "retrieval augmented generation", "retrieval-augmented generation"],
+      "type": "METHOD",
+      "broader": "NLP",
+      "definition": "A technique that combines retrieval of relevant documents with language model generation"
+    },
+    {
+      "id": "HyDE",
+      "preferred": "Hypothetical Document Embeddings",
+      "aliases": ["HyDE", "hypothetical document embedding", "hyde"],
+      "type": "METHOD",
+      "broader": "query_expansion",
+      "definition": "Query expansion technique that generates a hypothetical document and uses its embedding for retrieval"
+    },
+    {
+      "id": "BM25",
+      "preferred": "BM25",
+      "aliases": ["BM25", "Okapi BM25", "best match 25", "bm25"],
+      "type": "METHOD",
+      "broader": "keyword_retrieval",
+      "definition": "Probabilistic ranking function for information retrieval"
+    },
+    {
+      "id": "HNSW",
+      "preferred": "Hierarchical Navigable Small World",
+      "aliases": ["HNSW", "hnsw", "hierarchical navigable small world"],
+      "type": "METHOD",
+      "broader": "approximate_nearest_neighbor",
+      "definition": "Graph-based approximate nearest neighbor search algorithm"
+    },
+    {
+      "id": "ANN",
+      "preferred": "Approximate Nearest Neighbor",
+      "aliases": ["ANN", "approximate nearest neighbor", "approximate nearest neighbour"],
+      "type": "METHOD",
+      "broader": "vector_search"
+    },
+    {
+      "id": "LLM",
+      "preferred": "Large Language Model",
+      "aliases": ["LLM", "large language model", "language model", "LLMs"],
+      "type": "CONCEPT",
+      "broader": "NLP"
+    },
+    {
+      "id": "embedding",
+      "preferred": "embedding",
+      "aliases": ["embedding", "embeddings", "vector embedding", "dense vector", "semantic embedding"],
+      "type": "CONCEPT",
+      "broader": "representation_learning"
+    },
+    {
+      "id": "chunk",
+      "preferred": "chunk",
+      "aliases": ["chunk", "chunks", "passage", "passages", "text segment", "text chunk"],
+      "type": "CONCEPT",
+      "broader": "document_processing"
+    },
+    {
+      "id": "reranking",
+      "preferred": "reranking",
+      "aliases": ["reranking", "re-ranking", "reranker", "cross-encoder reranking"],
+      "type": "METHOD",
+      "broader": "retrieval"
+    },
+    {
+      "id": "RRF",
+      "preferred": "Reciprocal Rank Fusion",
+      "aliases": ["RRF", "reciprocal rank fusion", "rank fusion"],
+      "type": "METHOD",
+      "broader": "retrieval_fusion"
+    },
+    {
+      "id": "knowledge_graph",
+      "preferred": "knowledge graph",
+      "aliases": ["knowledge graph", "KG", "knowledge base", "semantic graph"],
+      "type": "CONCEPT",
+      "broader": "knowledge_representation"
+    },
+    {
+      "id": "GraphRAG",
+      "preferred": "GraphRAG",
+      "aliases": ["GraphRAG", "Graph RAG", "graph-based RAG", "graph rag"],
+      "type": "METHOD",
+      "broader": "RAG"
+    },
+    {
+      "id": "agentic_rag",
+      "preferred": "Agentic RAG",
+      "aliases": ["agentic RAG", "agent-based RAG", "autonomous RAG", "agentic retrieval"],
+      "type": "METHOD",
+      "broader": "RAG"
+    },
+    {
+      "id": "hallucination",
+      "preferred": "hallucination",
+      "aliases": ["hallucination", "hallucinations", "confabulation", "factual error", "allucinazione"],
+      "type": "CONCEPT",
+      "broader": "LLM_reliability"
+    },
+    {
+      "id": "grounding",
+      "preferred": "grounding",
+      "aliases": ["grounding", "factual grounding", "source grounding", "ancoraggio fattuale"],
+      "type": "CONCEPT",
+      "broader": "LLM_reliability"
+    },
+    {
+      "id": "ontology",
+      "preferred": "ontology",
+      "aliases": ["ontology", "ontologies", "ontologia", "OWL ontology"],
+      "type": "CONCEPT",
+      "broader": "knowledge_representation"
+    },
+    {
+      "id": "vector_store",
+      "preferred": "vector store",
+      "aliases": ["vector store", "vector database", "vector DB", "vector index", "VectorDB"],
+      "type": "CONCEPT",
+      "broader": "storage"
+    },
+    {
+      "id": "GDPR",
+      "preferred": "GDPR",
+      "aliases": ["GDPR", "General Data Protection Regulation", "Regolamento Generale sulla Protezione dei Dati"],
+      "type": "REGULATION",
+      "broader": "data_protection"
+    },
+    {
+      "id": "NER",
+      "preferred": "Named Entity Recognition",
+      "aliases": ["NER", "named entity recognition", "entity recognition", "entity extraction"],
+      "type": "METHOD",
+      "broader": "NLP"
+    },
+    {
+      "id": "dense_retrieval",
+      "preferred": "dense retrieval",
+      "aliases": ["dense retrieval", "dense vector retrieval", "semantic search", "semantic retrieval"],
+      "type": "METHOD",
+      "broader": "retrieval"
+    },
+    {
+      "id": "sparse_retrieval",
+      "preferred": "sparse retrieval",
+      "aliases": ["sparse retrieval", "keyword retrieval", "lexical retrieval", "BM25 retrieval"],
+      "type": "METHOD",
+      "broader": "retrieval"
+    },
+    {
+      "id": "self_rag",
+      "preferred": "Self-RAG",
+      "aliases": ["Self-RAG", "self-rag", "self RAG", "self-reflective RAG"],
+      "type": "METHOD",
+      "broader": "RAG"
+    },
+    {
+      "id": "ColBERT",
+      "preferred": "ColBERT",
+      "aliases": ["ColBERT", "colbert", "late interaction", "MaxSim"],
+      "type": "METHOD",
+      "broader": "dense_retrieval"
+    },
+    {
+      "id": "RAGAS",
+      "preferred": "RAGAS",
+      "aliases": ["RAGAS", "ragas", "RAG evaluation", "RAG assessment"],
+      "type": "DATASET",
+      "broader": "evaluation"
+    }
+  ]
+}

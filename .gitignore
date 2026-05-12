@@ -1,0 +1,98 @@
+# ── Secrets & env ─────────────────────────────────────────────────────────────
+.env
+*.env.local
+*.env.production
+secrets/
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+lib/
+lib64/
+wheels/
+*.whl
+*.so
+*.dylib
+pip-wheel-metadata/
+.installed.cfg
+MANIFEST
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+.virtualenv/
+
+# ── uv ────────────────────────────────────────────────────────────────────────
+.uv/
+uv.lock
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+*.ipynb
+
+# ── Docker volumes / local data ───────────────────────────────────────────────
+mvp/data/uploads/
+mvp/data/cache/
+local-dev/data/
+
+# ── Modelli e artefatti pesanti ───────────────────────────────────────────────
+*.bin
+*.safetensors
+*.gguf
+*.onnx
+*.pt
+*.pth
+models/
+model_cache/
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+*.out
+
+# ── Test / coverage ───────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+
+# ── Mypy / Ruff / linters ─────────────────────────────────────────────────────
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+dmypy.json
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+.AppleDouble
+.LSOverride
+desktop.ini
+$RECYCLE.BIN/
+
+# ── Papers (PDF binari) ───────────────────────────────────────────────────────
+papers/**/*.pdf
+
+# ── Tuner history (runtime state) ────────────────────────────────────────────
+mvp/data/tuner_history.json
