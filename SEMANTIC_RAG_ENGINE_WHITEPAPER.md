@@ -1001,7 +1001,8 @@ The `ComplianceResult` is serialised into the `compliance` field of the `QueryRe
       {
         "framework": "GDPR",
         "severity": "high",
-        "message": "GDPR Art. 33/34 — un data breach deve essere notificato all'autorità di controllo entro 72 ore..."
+        "message": "GDPR Art. 33/34 — un data breach deve 
+        essere notificato all'autorità di controllo entro 72 ore..."
       }
     ]
   }
@@ -1201,43 +1202,43 @@ The MVP is a fully functional end-to-end implementation of the Semantic RAG Engi
 
 | Component | Status | Notes |
 |---|---|---|
-| PDF ingestion (PyMuPDF + Nougat OCR) | ✅ Full | Image-only PDF fallback via Nougat |
-| Markdown ingestion | ✅ Full | Same chunking/embedding pipeline |
-| Section-aware semantic chunking | ✅ Full | Regex-based section detection |
-| Ollama embedding (nomic-embed-text) | ✅ Full | 768-dim, fully local |
-| Qdrant vector storage + HNSW | ✅ Full | Payload filtering for metadata |
-| PostgreSQL metadata + FTS | ✅ Full | pg_trgm for fuzzy search |
-| OpenSearch BM25 | ✅ Full | Multi-field boosting |
-| Neo4j knowledge graph | ✅ Full | Entity/relation storage + Cypher |
-| Tree index (PostgreSQL LTREE) | ✅ Full | 4-level hierarchy |
-| MinIO object storage | ✅ Full | Raw PDF + parsed artefacts |
-| Redis semantic cache (F5B) | ✅ Full | Cosine similarity threshold |
-| HyDE query rewriting (F3) | ✅ Full | Averaged embedding |
-| Query expansion via thesaurus (F4) | ✅ Full | JSON thesaurus file |
-| RRF fusion (vector + BM25 + tree) | ✅ Full | 3-source fusion |
-| Cross-encoder reranking (ms-marco) | ✅ Full | MiniLM-L-6-v2, CPU inference |
-| Intent gate (F2) | ✅ Full | Regex fast-path + async LLM fallback for ambiguous queries |
-| S2G evaluator (F6A) | ✅ Full | LLM-scored sufficiency |
-| Iterative controller (F6B–F6F) | ✅ Full | Max 3 iterations |
-| Contradiction detector (F6D) | ✅ Full | LLM-based |
-| Context compression (G7A) | ✅ Full | Token budget aware |
-| Grounding check (H3) | ✅ Full | Lexical overlap |
-| Confabulation guard (G7B) | ✅ Full | Numerical/date span detection |
-| Citation validator (H4) | ✅ Full | Source cross-check |
-| Merkle audit log (E6) | ✅ Full | SHA-256 chain, append-only |
-| JWT auth + RBAC (I1) | ✅ Full | Reader/Writer/Admin roles |
-| Prometheus monitoring (I3) | ✅ Full | 9 metrics, Grafana-ready |
-| RAGAS evaluation service (I4) | ✅ Full | Background async evaluation |
-| Knowledge graph builder (C6) | ✅ Full | Auto-triggered in background after every ingestion |
-| KG context injection (C5) | ✅ Full | Subgraph context prepended to RAG prompt at query time |
-| Document listing (CRUD) | ✅ Full | GET /api/v1/documents returns all indexed documents |
-| Document deletion (CRUD) | ✅ Full | DELETE /api/v1/documents/{doc_id} purges all 4 stores |
-| SSE streaming (I6) | ✅ Full | POST /api/v1/query/stream yields token-by-token SSE events |
-| CORS | ✅ Full | CORSMiddleware allows all origins (configurable) |
-| Secure token issuance | ✅ Full | POST /api/v1/auth/token requires X-Admin-Secret header |
-| AutoRAGTuner (I8) | ✅ Full | UCB1 Bayesian optimiser; `GET /tuner/params`, `POST /tuner/record`, `POST /tuner/optimize`; JSON-persisted history |
-| Airflow batch scheduler | ✅ Full | Three-service stack (init + scheduler + webserver); `batch_pdf_ingest` DAG — nightly MinIO scan → ingest → AutoRAGTuner |
-| Compliance check (H5) | ✅ Full | Regex rule engine; GDPR / NIS2 / AI Act / DORA / CCPA / HIPAA; action-verb classifier + legal disclaimer |
+| PDF ingestion (PyMuPDF + Nougat OCR) | ✓ Full | Image-only PDF fallback via Nougat |
+| Markdown ingestion | ✓ Full | Same chunking/embedding pipeline |
+| Section-aware semantic chunking | ✓ Full | Regex-based section detection |
+| Ollama embedding (nomic-embed-text) | ✓ Full | 768-dim, fully local |
+| Qdrant vector storage + HNSW | ✓ Full | Payload filtering for metadata |
+| PostgreSQL metadata + FTS | ✓ Full | pg_trgm for fuzzy search |
+| OpenSearch BM25 | ✓ Full | Multi-field boosting |
+| Neo4j knowledge graph | ✓ Full | Entity/relation storage + Cypher |
+| Tree index (PostgreSQL LTREE) | ✓ Full | 4-level hierarchy |
+| MinIO object storage | ✓ Full | Raw PDF + parsed artefacts |
+| Redis semantic cache (F5B) | ✓ Full | Cosine similarity threshold |
+| HyDE query rewriting (F3) | ✓ Full | Averaged embedding |
+| Query expansion via thesaurus (F4) | ✓ Full | JSON thesaurus file |
+| RRF fusion (vector + BM25 + tree) | ✓ Full | 3-source fusion |
+| Cross-encoder reranking (ms-marco) | ✓ Full | MiniLM-L-6-v2, CPU inference |
+| Intent gate (F2) | ✓ Full | Regex fast-path + async LLM fallback for ambiguous queries |
+| S2G evaluator (F6A) | ✓ Full | LLM-scored sufficiency |
+| Iterative controller (F6B–F6F) | ✓ Full | Max 3 iterations |
+| Contradiction detector (F6D) | ✓ Full | LLM-based |
+| Context compression (G7A) | ✓ Full | Token budget aware |
+| Grounding check (H3) | ✓ Full | Lexical overlap |
+| Confabulation guard (G7B) | ✓ Full | Numerical/date span detection |
+| Citation validator (H4) | ✓ Full | Source cross-check |
+| Merkle audit log (E6) | ✓ Full | SHA-256 chain, append-only |
+| JWT auth + RBAC (I1) | ✓ Full | Reader/Writer/Admin roles |
+| Prometheus monitoring (I3) | ✓ Full | 9 metrics, Grafana-ready |
+| RAGAS evaluation service (I4) | ✓ Full | Background async evaluation |
+| Knowledge graph builder (C6) | ✓ Full | Auto-triggered in background after every ingestion |
+| KG context injection (C5) | ✓ Full | Subgraph context prepended to RAG prompt at query time |
+| Document listing (CRUD) | ✓ Full | GET /api/v1/documents returns all indexed documents |
+| Document deletion (CRUD) | ✓ Full | DELETE /api/v1/documents/{doc_id} purges all 4 stores |
+| SSE streaming (I6) | ✓ Full | POST /api/v1/query/stream yields token-by-token SSE events |
+| CORS | ✓ Full | CORSMiddleware allows all origins (configurable) |
+| Secure token issuance | ✓ Full | POST /api/v1/auth/token requires X-Admin-Secret header |
+| AutoRAGTuner (I8) | ✓ Full | UCB1 Bayesian optimiser; `GET /tuner/params`, `POST /tuner/record`, `POST /tuner/optimize`; JSON-persisted history |
+| Airflow batch scheduler | ✓ Full | Three-service stack (init + scheduler + webserver); `batch_pdf_ingest` DAG — nightly MinIO scan → ingest → AutoRAGTuner |
+| Compliance check (H5) | ✓ Full | Regex rule engine; GDPR / NIS2 / AI Act / DORA / CCPA / HIPAA; action-verb classifier + legal disclaimer |
 
 ### 1.2 Technology Stack
 
@@ -1773,10 +1774,10 @@ curl -H "Authorization: Bearer eyJ..." \
 
 | Role | Query | Ingest | Delete | Manage KG | Audit |
 |---|---|---|---|---|---|
-| `Reader` | ✅ | ❌ | ❌ | ❌ | ❌ |
-| `Writer` | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `Admin` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `Auditor` | ✅ | ❌ | ❌ | ❌ | ✅ |
+| `Reader` | ✓ | ✗ | ✗ | ✗ | ✗ |
+| `Writer` | ✓ | ✓ | ✗ | ✗ | ✗ |
+| `Admin` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `Auditor` | ✓ | ✗ | ✗ | ✗ | ✓ |
 
 ---
 
