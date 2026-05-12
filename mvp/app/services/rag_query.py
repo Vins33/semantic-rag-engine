@@ -26,7 +26,7 @@ from app.pipeline.controller import run as controller_run
 from app.pipeline.expansion import expand_query
 from app.pipeline.grounding import check_grounding
 from app.pipeline.hyde import hyde_embedding
-from app.pipeline.intent import analyze_intent
+from app.pipeline.intent import analyze_intent, analyze_intent_async
 from app.core import ollama
 from app.core.monitoring import (
     cache_hits_total, confabulation_total, query_latency,
@@ -39,6 +39,7 @@ from app.storage import db, vector as vec_store
 from app.storage import opensearch as os_store
 from app.pipeline.token_budget import enforce_budget
 from app.indexing.tree_retrieval import retrieve_tree
+from app.storage import kg as kg_store
 
 logger = logging.getLogger(__name__)
 
@@ -138,8 +139,8 @@ class RagQueryService:
         k = top_k or settings.top_k
         t0 = time.monotonic()
 
-        # 0. Intent Gate
-        intent = analyze_intent(query)
+        # 0. Intent Gate (with async LLM fallback for ambiguous queries)
+        intent = await analyze_intent_async(query)
         if not intent.retrieval_needed:
             query_latency.observe(time.monotonic() - t0)
             return {
@@ -238,6 +239,15 @@ class RagQueryService:
             })
 
         context = "\n\n---\n\n".join(context_parts)
+
+        # C5 — KG enrichment: inject subgraph context for key entities in query
+        try:
+            kg_context = kg_store.get_entity_context(query)
+            if kg_context:
+                context = f"[Knowledge Graph Context]\n{kg_context}\n\n---\n\n{context}"
+                logger.debug("C5 KG context injected (%d chars)", len(kg_context))
+        except Exception as _kg_exc:
+            logger.debug("C5 KG context unavailable: %s", _kg_exc)
 
         # 10. Token budget
         context, was_cut = enforce_budget(context, query)

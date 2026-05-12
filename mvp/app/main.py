@@ -5,10 +5,14 @@ FastAPI app con due endpoint principali:
   POST /api/v1/query    → interroga il corpus in linguaggio naturale
 """
 
+import asyncio
+import json as _json
 from contextlib import asynccontextmanager
-from typing import Optional
+from typing import AsyncGenerator, Optional
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, UploadFile, File, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from fastapi.routing import Mount
 from pydantic import BaseModel
 
@@ -23,7 +27,7 @@ from app.models import (
     IngestResponse, QueryRequest, QueryResponse, Source, GroundingInfo,
     ConfabulationInfo, CitationInfo, IntentInfo, ControllerInfo, TreeRetrievalInfo,
 )
-from app.core.monitoring import metrics_app
+from app.core.monitoring import metrics_app, ingest_total
 from app.services.rag_query import RagQueryService
 from app.services.eval_service import EvalService
 from app.storage import db, object as obj_store, vector as vec_store
@@ -56,6 +60,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# CORS — permette al frontend NiceGUI/Streamlit (porta diversa) di chiamare le API
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],          # restringere in produzione
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # I3 — Prometheus metrics endpoint
 app.mount("/metrics", metrics_app)
 
@@ -65,12 +78,67 @@ app.mount("/metrics", metrics_app)
 @app.get("/api/v1/health", tags=["infra"])
 async def health():
     """Verifica che tutti i servizi siano raggiungibili."""
-    ollama_ok = await ollama.health_check()
-    return {
-        "status":      "ok" if ollama_ok else "degraded",
-        "ollama":      "ok" if ollama_ok else "unreachable — esegui: make pull-models",
-        "embed_model": app.state.__dict__.get("embed_model", "nomic-embed-text"),
-    }
+    import httpx
+    import redis as _redis
+
+    results: dict[str, str] = {}
+
+    # Ollama
+    results["ollama"] = "ok" if await ollama.health_check() else "unreachable"
+
+    # Qdrant
+    try:
+        vec_store.get_client().get_collections()
+        results["qdrant"] = "ok"
+    except Exception as e:
+        results["qdrant"] = f"unreachable: {e}"
+
+    # PostgreSQL
+    try:
+        db.get_pool().getconn()
+        results["postgres"] = "ok"
+    except Exception as e:
+        results["postgres"] = f"unreachable: {e}"
+
+    # Redis
+    try:
+        from app.core.config import settings as _cfg
+        r = _redis.Redis(host=_cfg.redis_host, port=_cfg.redis_port,
+                         socket_connect_timeout=2, socket_timeout=2)
+        r.ping()
+        results["redis"] = "ok"
+    except Exception as e:
+        results["redis"] = f"unreachable: {e}"
+
+    # OpenSearch
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            resp = await client.get(f"{_cfg.opensearch_url}/_cluster/health")
+            results["opensearch"] = "ok" if resp.status_code == 200 else f"status {resp.status_code}"
+    except Exception as e:
+        results["opensearch"] = f"unreachable: {e}"
+
+    # Neo4j
+    try:
+        from app.storage import kg
+        driver = kg._get_driver()
+        if driver:
+            driver.verify_connectivity()
+            results["neo4j"] = "ok"
+        else:
+            results["neo4j"] = "unreachable"
+    except Exception as e:
+        results["neo4j"] = f"unreachable: {e}"
+
+    # MinIO
+    try:
+        obj_store.get_client().bucket_exists("_healthcheck_probe_")
+        results["minio"] = "ok"
+    except Exception as e:
+        results["minio"] = "ok" if "NoSuchBucket" in str(e) or "does not exist" in str(e) else f"unreachable: {e}"
+
+    overall = "ok" if all(v == "ok" for v in results.values()) else "degraded"
+    return {"status": overall, **results}
 
 
 @app.post(
@@ -112,7 +180,91 @@ async def ingest_endpoint(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Errore ingestione: {exc}",
         )
+    # I3 — increment ingest counter
+    ingest_total.labels(doc_type="pdf" if is_pdf else "markdown").inc()
     return IngestResponse(**result)
+
+
+@app.get(
+    "/api/v1/documents",
+    tags=["ingestione"],
+    summary="Lista tutti i documenti indicizzati con metadati",
+)
+async def list_documents(_user: TokenPayload = Depends(require_reader)):
+    """Ritorna tutti i documenti presenti nel corpus con i loro metadati D3+D4."""
+    docs = db.get_all_documents()
+    return {"total": len(docs), "documents": docs}
+
+
+@app.delete(
+    "/api/v1/documents/{doc_id}",
+    tags=["ingestione"],
+    summary="Rimuove un documento da tutti gli store (Qdrant, PG, OpenSearch, MinIO)",
+)
+async def delete_document(
+    doc_id: str,
+    _user: TokenPayload = Depends(require_admin),
+):
+    """
+    Purge completo di un documento:
+      - Qdrant: delete points by doc_id payload filter
+      - OpenSearch: delete chunks by doc_id query
+      - PostgreSQL: DELETE CASCADE (chunks, entities, triples, tree_nodes)
+      - MinIO: rimuove raw/{doc_id}.pdf e parsed/{doc_id}.md
+    """
+    from app.storage import opensearch as os_store
+    from qdrant_client.models import Filter, FieldCondition, MatchValue
+    from app.core.audit import log_event
+    from app.core.config import settings as _cfg
+
+    # Verify document exists
+    docs = db.get_all_documents()
+    doc = next((d for d in docs if d["doc_id"] == doc_id), None)
+    if doc is None:
+        raise HTTPException(status_code=404, detail=f"Documento {doc_id} non trovato.")
+
+    errors: list[str] = []
+
+    # 1. Qdrant — delete all points with doc_id
+    try:
+        vec_store.get_client().delete(
+            collection_name=_cfg.qdrant_collection,
+            points_selector=Filter(
+                must=[FieldCondition(key="doc_id", match=MatchValue(value=doc_id))]
+            ),
+        )
+    except Exception as e:
+        errors.append(f"qdrant: {e}")
+
+    # 2. OpenSearch — delete by doc_id query
+    try:
+        os_store.delete_by_doc(doc_id)
+    except Exception as e:
+        errors.append(f"opensearch: {e}")
+
+    # 3. PostgreSQL — CASCADE deletes chunks, entities, triples, tree_nodes
+    try:
+        db.delete_document(doc_id)
+    except Exception as e:
+        errors.append(f"postgres: {e}")
+
+    # 4. MinIO — raw + parsed objects
+    try:
+        c = obj_store.get_client()
+        for key in [f"raw/{doc_id}.pdf", f"parsed/{doc_id}.md"]:
+            try:
+                c.remove_object(_cfg.minio_bucket, key)
+            except Exception:
+                pass
+    except Exception as e:
+        errors.append(f"minio: {e}")
+
+    log_event("delete", doc_id, {"filename": doc.get("filename", ""), "errors": errors})
+    return {
+        "doc_id":  doc_id,
+        "deleted": True,
+        "errors":  errors,
+    }
 
 
 @app.post(
@@ -148,6 +300,161 @@ async def query_endpoint(
         intent=IntentInfo(**result["intent"]) if result.get("intent") else None,
         controller=ControllerInfo(**result["controller"]) if result.get("controller") else None,
         tree_retrieval=TreeRetrievalInfo(**result["tree_retrieval"]) if result.get("tree_retrieval") else None,
+    )
+
+
+@app.post(
+    "/api/v1/query/stream",
+    tags=["query"],
+    summary="Streaming SSE: interroga il corpus e riceve la risposta token per token",
+)
+async def query_stream_endpoint(
+    req: QueryRequest,
+    _user: TokenPayload = Depends(require_reader),
+):
+    """
+    Streaming response via Server-Sent Events (SSE).
+    Emette eventi:
+      data: {"type": "token",  "text": "<token>"}
+      data: {"type": "sources","sources": [...]}
+      data: {"type": "done",   "grounding": {...}, "confabulation": {...}}
+    """
+    if not req.query.strip():
+        raise HTTPException(status_code=400, detail="La query non può essere vuota.")
+
+    async def _event_generator() -> AsyncGenerator[str, None]:
+        from app.pipeline.hyde import hyde_embedding
+        from app.pipeline.intent import analyze_intent
+        from app.core.cache import cache_get, cache_set
+        from app.pipeline.expansion import expand_query
+        from app.pipeline.rerank import rerank
+        from app.pipeline.compress import compress_chunks
+        from app.pipeline.token_budget import enforce_budget
+        from app.pipeline.grounding import check_grounding
+        from app.pipeline.confabulation import check_confabulation
+        from app.pipeline.s2g import evaluate as s2g_evaluate
+        from app.pipeline.controller import run as controller_run
+        from app.storage import opensearch as os_store
+        from app.indexing.tree_retrieval import retrieve_tree
+        from app.storage import kg as kg_store
+        from app.prompts.rag import RAG_ANSWER
+        import httpx
+
+        k = req.top_k or 6
+        intent = analyze_intent(req.query)
+        if not intent.retrieval_needed:
+            yield f"data: {_json.dumps({'type': 'token', 'text': intent.direct_answer})}\n\n"
+            yield f"data: {_json.dumps({'type': 'done', 'grounding': {'grounded': True, 'score': 1.0}})}\n\n"
+            return
+
+        k = int(k * intent.top_k_multiplier)
+        query_vector = await hyde_embedding(req.query)
+
+        # Cache check
+        cached = cache_get(query_vector)
+        if cached is not None:
+            yield f"data: {_json.dumps({'type': 'token', 'text': cached['answer']})}\n\n"
+            yield f"data: {_json.dumps({'type': 'sources', 'sources': cached.get('sources', [])})}\n\n"
+            yield f"data: {_json.dumps({'type': 'done', 'cache_hit': True})}\n\n"
+            return
+
+        # Retrieval
+        qdrant_filter = None
+        os_filters: dict = {}
+        if req.filters:
+            qdrant_filter = vec_store.build_qdrant_filter(
+                domain=req.filters.domain, language=req.filters.language,
+                doc_type=req.filters.doc_type, year_from=req.filters.year_from,
+                year_to=req.filters.year_to,
+            )
+            if req.filters.domain:  os_filters["domain"]   = req.filters.domain
+            if req.filters.language: os_filters["language"] = req.filters.language
+            if req.filters.doc_type: os_filters["doc_type"] = req.filters.doc_type
+
+        vector_hits = vec_store.vector_search(query_vector, limit=k * 4, filt=qdrant_filter)
+        expansion   = expand_query(req.query)
+        fts_hits    = os_store.search_bm25(expansion.expanded_query, k=k * 4,
+                                           filters=os_filters if os_filters else None)
+        if not fts_hits:
+            fts_hits = db.fts_search(expansion.expanded_query, limit=k * 4)
+        tree_hits   = retrieve_tree(req.query, k=k * 2)
+
+        rrf = _rag_service._rrf(vector_hits, fts_hits, tree_hits=tree_hits)[:k * 2]
+        ranked = rerank(req.query, rrf)[:k]
+
+        if not ranked:
+            yield f"data: {_json.dumps({'type': 'token', 'text': 'Nessun documento pertinente trovato.'})}\n\n"
+            yield f"data: {_json.dumps({'type': 'done'})}\n\n"
+            return
+
+        compressed = compress_chunks(req.query, ranked)
+        context_parts, sources = [], []
+        for (cid, orig, score), (_, comp, _) in zip(ranked, compressed):
+            context_parts.append(f"[{orig['filename']} | pag. {orig['page_start']}]\n{comp['text']}")
+            sources.append({
+                "chunk_id": cid, "doc_id": orig["doc_id"],
+                "filename": orig["filename"], "page": orig["page_start"],
+                "text_preview": orig["text"][:200], "score": round(score, 4),
+                "bm25_source": orig.get("bm25_source", "vector"),
+            })
+
+        context = "\n\n---\n\n".join(context_parts)
+        try:
+            kg_ctx = kg_store.get_entity_context(req.query)
+            if kg_ctx:
+                context = f"[Knowledge Graph Context]\n{kg_ctx}\n\n---\n\n{context}"
+        except Exception:
+            pass
+
+        context, _ = enforce_budget(context, req.query)
+        s2g_result  = await s2g_evaluate(req.query, context)
+        ctrl = await controller_run(
+            query=req.query, initial_context=context,
+            retrieval_fn=_rag_service._make_retrieval_fn(k, qdrant_filter, os_filters),
+            initial_s2g_score=s2g_result["score"],
+        )
+        context = ctrl.final_context
+
+        # Emit sources before streaming tokens
+        yield f"data: {_json.dumps({'type': 'sources', 'sources': sources})}\n\n"
+
+        # Streaming generation via Ollama stream=true
+        prompt = RAG_ANSWER.format(context=context, query=req.query)
+        from app.core.config import settings as _cfg
+        full_answer = ""
+        try:
+            async with httpx.AsyncClient(timeout=180.0) as client:
+                async with client.stream(
+                    "POST",
+                    f"{_cfg.ollama_base_url}/api/generate",
+                    json={"model": _cfg.chat_model, "prompt": prompt,
+                          "stream": True, "options": {"temperature": 0.1, "num_predict": 1024}},
+                ) as resp:
+                    async for line in resp.aiter_lines():
+                        if not line.strip():
+                            continue
+                        try:
+                            chunk_data = _json.loads(line)
+                            token = chunk_data.get("response", "")
+                            if token:
+                                full_answer += token
+                                yield f"data: {_json.dumps({'type': 'token', 'text': token})}\n\n"
+                            if chunk_data.get("done"):
+                                break
+                        except Exception:
+                            continue
+        except Exception as e:
+            yield f"data: {_json.dumps({'type': 'error', 'detail': str(e)})}\n\n"
+            return
+
+        grounding = check_grounding(full_answer, [p["text"] for _, p, _ in compressed])
+        confab    = check_confabulation(full_answer, [p["text"] for _, p, _ in compressed])
+        yield f"data: {_json.dumps({'type': 'done', 'grounding': grounding, 'confabulation': {'has_confabulation': confab.has_confabulation, 'confidence': confab.confidence}})}\n\n"
+
+    return StreamingResponse(
+        _event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
 
 
@@ -319,6 +626,11 @@ async def tree_get_node(path: str):
 
 # ── I1 — Auth: token generation (sviluppo) ─────────────────────────────────────────
 
+import os as _os
+from fastapi import Header
+
+_TOKEN_ADMIN_SECRET = _os.environ.get("TOKEN_ADMIN_SECRET", "")
+
 class _TokenRequest(BaseModel):
     sub:  str
     role: str = "reader"   # reader | writer | admin
@@ -328,10 +640,27 @@ class _TokenRequest(BaseModel):
 @app.post(
     "/api/v1/auth/token",
     tags=["auth"],
-    summary="I1 — Genera JWT per test/sviluppo (non usare in prod senza segreto custom)",
+    summary="I1 — Genera JWT per test/sviluppo (richiede X-Admin-Secret header)",
 )
-async def generate_token(req: _TokenRequest):
-    """Genera un JWT firmato. In produzione proteggere con credenziali."""
+async def generate_token(
+    req: _TokenRequest,
+    x_admin_secret: str = Header(default="", alias="X-Admin-Secret"),
+):
+    """
+    Genera un JWT firmato. Richiede l'header X-Admin-Secret uguale alla
+    variabile d'ambiente TOKEN_ADMIN_SECRET (se non impostata, endpoint disabilitato).
+    """
+    if not _TOKEN_ADMIN_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Token generation disabled: set TOKEN_ADMIN_SECRET env var to enable.",
+        )
+    if x_admin_secret != _TOKEN_ADMIN_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid X-Admin-Secret.",
+            headers={"WWW-Authenticate": "X-Admin-Secret"},
+        )
     if req.role not in ("reader", "writer", "admin"):
         raise HTTPException(status_code=400, detail="role deve essere reader | writer | admin")
     token = create_access_token(

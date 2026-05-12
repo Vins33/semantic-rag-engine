@@ -272,6 +272,23 @@ def get_all_documents() -> list[dict]:
         get_pool().putconn(conn)
 
 
+def delete_document(doc_id: str) -> bool:
+    """
+    Rimuove un documento da PostgreSQL.
+    Il CASCADE elimina automaticamente: chunks, entities, triples, tree_nodes.
+    Ritorna True se il documento esisteva.
+    """
+    conn = get_pool().getconn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM documents WHERE doc_id = %s", (doc_id,))
+            deleted = cur.rowcount > 0
+        conn.commit()
+        return deleted
+    finally:
+        get_pool().putconn(conn)
+
+
 def fts_search(
     query: str,
     limit: int,

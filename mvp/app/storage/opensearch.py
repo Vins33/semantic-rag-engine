@@ -238,3 +238,22 @@ def delete_chunk(chunk_id: str) -> bool:
     except Exception as exc:
         logger.warning("OpenSearch delete_chunk error: %s", exc)
         return False
+
+
+def delete_by_doc(doc_id: str) -> int:
+    """
+    Rimuove dall'indice OpenSearch tutti i chunk appartenenti a doc_id.
+    Usa Delete-By-Query API. Ritorna il numero di documenti eliminati.
+    """
+    url = f"{_base_url()}/{_INDEX}/_delete_by_query"
+    body = {"query": {"term": {"doc_id": doc_id}}}
+    try:
+        with httpx.Client(timeout=30.0) as client:
+            resp = client.post(url, json=body)
+            if resp.status_code == 200:
+                return resp.json().get("deleted", 0)
+            logger.warning("OpenSearch delete_by_doc status %s: %s", resp.status_code, resp.text[:200])
+            return 0
+    except Exception as exc:
+        logger.warning("OpenSearch delete_by_doc error: %s", exc)
+        return 0

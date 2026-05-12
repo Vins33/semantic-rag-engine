@@ -13,10 +13,16 @@ Output: IntentResult con campi:
   - complexity: "trivial" | "simple" | "complex"
   - direct_answer: str | None   (solo se retrieval_needed=False)
   - intent_tags: list[str]
+
+Fase 1: regex leggera (sincrona, < 1ms).
+Fase 2 (async): se query è di lunghezza media e non matchata, fallback LLM.
 """
 
+import logging
 import re
 from dataclasses import dataclass, field
+
+logger = logging.getLogger(__name__)
 
 # ── Patterns per bypass retrieval ─────────────────────────────────────────────
 
@@ -132,3 +138,66 @@ def analyze_intent(query: str) -> IntentResult:
         intent_tags=tags or ["general"],
         top_k_multiplier=1.0,
     )
+
+
+# ── LLM-based fallback for ambiguous queries (async) ─────────────────────────
+
+_LLM_INTENT_PROMPT = """\
+Classifica la seguente QUERY in una di queste categorie:
+  "trivial"  — saluto, domanda meta (chi sei, cosa puoi fare), ringraziamento
+  "simple"   — domanda fattuale diretta su un singolo concetto
+  "complex"  — confronto, riassunto, analisi multi-step, lista esaustiva
+
+Rispondi SOLO con un JSON nel formato:
+{{"complexity": "<trivial|simple|complex>", "tags": ["tag1","tag2"], "reason": "<max 10 parole>"}}
+
+QUERY: {query}
+JSON:"""
+
+
+async def analyze_intent_async(query: str) -> IntentResult:
+    """
+    Analisi intent con fallback LLM per query di lunghezza media (8-15 parole)
+    che la regex non classifica come complex ma potrebbero esserlo.
+    Per query corte o chiaramente classificate, usa il risultato sincrono direttamente.
+    """
+    sync_result = analyze_intent(query)
+
+    # Non invocare LLM per triviali o query già classificate complex
+    if not sync_result.retrieval_needed or sync_result.complexity == "complex":
+        return sync_result
+
+    word_count = len(query.strip().split())
+    # LLM fallback solo per query di lunghezza intermedia (ambigua per regex)
+    if word_count < 5 or word_count > 20:
+        return sync_result
+
+    try:
+        from app.core import ollama
+        raw = await ollama.generate(
+            _LLM_INTENT_PROMPT.format(query=query),
+            num_predict=128,
+            num_ctx=512,
+        )
+        import json
+        import re as _re
+        m = _re.search(r'\{[^{}]*"complexity"[^{}]*\}', raw, _re.DOTALL)
+        if m:
+            obj = json.loads(m.group())
+            complexity = obj.get("complexity", "simple")
+            if complexity not in ("trivial", "simple", "complex"):
+                complexity = "simple"
+            tags = [str(t) for t in obj.get("tags", [])]
+            multiplier = 1.5 if complexity == "complex" else 1.0
+            logger.debug("LLM intent: %s → %s", query[:60], complexity)
+            return IntentResult(
+                retrieval_needed=complexity != "trivial",
+                complexity=complexity,
+                direct_answer=sync_result.direct_answer,
+                intent_tags=tags or sync_result.intent_tags,
+                top_k_multiplier=multiplier,
+            )
+    except Exception as exc:
+        logger.debug("LLM intent fallback failed: %s", exc)
+
+    return sync_result

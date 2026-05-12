@@ -11,14 +11,17 @@ Flusso PDF:
   6. Embedding batch → Ollama (nomic-embed-text)
   7. Upsert vettori + payload → Qdrant (E2)
   8. Testo chunk → PostgreSQL (E4, per FTS ibrida)
+  9. D1/D2 — Entity + Relation extraction (background, primi N chunk)
+ 10. C6 — KG build da triple estratte → Neo4j
 
 Flusso Markdown:
   1. Upload .md → MinIO (E1 parsed/)
   2. Parsing pagine dal markdown
-  3. Chunking → embedding → Qdrant/PostgreSQL (stessa pipeline)
+  3. Chunking → embedding → Qdrant/PostgreSQL (stessa pipeline) + D1/D2/C6
 """
 
 import hashlib
+import logging
 import re
 import uuid
 import asyncio
@@ -32,6 +35,8 @@ from app.core.config import settings
 from app.knowledge.metadata import enrich_document
 from app.ingestion.pdf_to_md import pdf_to_markdown, markdown_to_pages
 from app.storage import db, object as obj_store, vector as vec_store
+
+logger = logging.getLogger(__name__)
 
 # ── Costanti ──────────────────────────────────────────────────────────────────
 _TARGET_CHARS  = settings.chunk_target_tokens  * 4   # ~4 char/token
@@ -207,6 +212,9 @@ async def ingest_pdf(filename: str, pdf_bytes: bytes) -> dict:
         "sha256": sha256[:16],
     })
 
+    # D1+D2+C6 — entity/relation extraction + KG build (background)
+    asyncio.create_task(_run_knowledge_pipeline(doc_id, chunks))
+
     return result
 
 
@@ -266,6 +274,9 @@ async def ingest_markdown(filename: str, md_bytes: bytes) -> dict:
         "domain": metadata["domain"],
         "sha256": sha256[:16],
     })
+
+    # D1+D2+C6 — entity/relation extraction + KG build (background)
+    asyncio.create_task(_run_knowledge_pipeline(doc_id, chunks))
 
     return result
 
@@ -348,3 +359,42 @@ async def _embed_and_store(
         "pages":          page_count,
         "chunks_created": len(chunks),
     }
+
+
+async def _run_knowledge_pipeline(doc_id: str, chunks: list[dict], max_chunks: int = 10) -> None:
+    """
+    D1+D2+C6 — Eseguito in background dopo _embed_and_store.
+    Estrae entità (D1) e relazioni (D2) dai primi max_chunks chunk,
+    poi costruisce il subgraph Neo4j (C6).
+    """
+    from app.services.knowledge_service import KnowledgeService
+    from app.knowledge import kg_builder
+
+    svc = KnowledgeService()
+    chunk_ids = [r for r in db.get_chunks_for_doc(doc_id, limit=max_chunks)]
+
+    for chunk_data in chunk_ids:
+        try:
+            entities = await svc.extract_entities(
+                text=chunk_data["text"],
+                doc_id=doc_id,
+                chunk_id=chunk_data["chunk_id"],
+                page=chunk_data["page_start"],
+            )
+            if entities:
+                await svc.extract_relations(
+                    text=chunk_data["text"],
+                    entities=entities,
+                    doc_id=doc_id,
+                    chunk_id=chunk_data["chunk_id"],
+                    page=chunk_data["page_start"],
+                )
+        except Exception as exc:
+            logger.warning("D1/D2 extraction error for chunk %s: %s", chunk_data.get("chunk_id"), exc)
+
+    # C6 — build Neo4j subgraph from extracted triples
+    try:
+        await asyncio.get_event_loop().run_in_executor(None, kg_builder.build_from_doc, doc_id)
+        logger.info("C6 KG build completed for doc_id=%s", doc_id)
+    except Exception as exc:
+        logger.warning("C6 KG build error for doc_id=%s: %s", doc_id, exc)

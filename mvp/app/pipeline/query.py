@@ -24,6 +24,7 @@ from app.core import ollama
 from app.core.audit import log_event
 from app.core.cache import cache_get, cache_set
 from app.pipeline.citation import validate_citations
+from app.pipeline.compliance import check_compliance
 from app.pipeline.compress import compress_chunks
 from app.pipeline.confabulation import check_confabulation
 from app.core.config import settings
@@ -272,6 +273,21 @@ async def answer_query(query: str, top_k: int | None = None, filters=None) -> di
     # 12. H4 — Citation Validator
     citation_result = validate_citations(final_answer, sources)
 
+    # 13. H5 — Compliance Check (triggered for regulated domains)
+    # Estrai dominio e topics dai metadati delle fonti recuperate
+    _domains  = [s.get("domain")  for s in sources if s.get("domain")]
+    _topics   = [t for s in sources for t in (s.get("topics") or [])]
+    _doc_domain = _domains[0] if _domains else (filters.domain if filters else None)
+    compliance = check_compliance(
+        answer=final_answer,
+        domain=_doc_domain,
+        topics=_topics or None,
+        query=query,
+    )
+    # Appendi compliance_note alla risposta se ci sono warning high-severity
+    if compliance.compliance_note:
+        final_answer = final_answer.strip() + "\n\n" + compliance.compliance_note
+
     result = {
         "answer":        final_answer.strip(),
         "sources":       sources,
@@ -282,6 +298,12 @@ async def answer_query(query: str, top_k: int | None = None, filters=None) -> di
             "has_confabulation": confab.has_confabulation,
             "confidence":        confab.confidence,
             "flags":             confab.flags,
+        },
+        "compliance": {
+            "has_warning":            compliance.has_warning,
+            "warnings":               compliance.warnings,
+            "active_frameworks":      compliance.active_frameworks,
+            "legal_disclaimer_added": compliance.legal_disclaimer_added,
         },
         "citation": {
             "valid_citations":   citation_result.valid_citations,
