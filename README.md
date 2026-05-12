@@ -2,6 +2,8 @@
 
 > Motore di Retrieval-Augmented Generation semantico, full-stack, con pipeline ibrida (vector + BM25 + graph) su documenti PDF/enterprise. Architettura evolutiva documentata in 7 versioni, dalla baseline alla multi-modale con knowledge graph causale.
 
+**License:** [PolyForm Noncommercial 1.0.0](LICENSE) — free for research and personal use. Commercial use requires a written agreement: calabrese.vinci@gmail.com
+
 ---
 
 ## Struttura del repository
